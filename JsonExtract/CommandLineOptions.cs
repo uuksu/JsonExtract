@@ -9,8 +9,11 @@ namespace JsonExtract
 {
     class CommandLineOptions
     {
-        [Option('i', "input", Required = true, HelpText = "Input file that is processed.")]
+        [Option('i', "input", Required = false, HelpText = "Input file that is processed.")]
         public string InputPath { get; set; }
+
+        [Option('d', "input-directory", Required = false, HelpText = "Input directory containing json files.")]
+        public string InputDirectoryPath { get; set; }
 
         [Option('o', "output", Required = true, HelpText = "Output file path.")]
         public string OutputPath { get; set; }
