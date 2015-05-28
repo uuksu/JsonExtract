@@ -1,10 +1,8 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using CommandLine;
 using CsvHelper;
 using CsvHelper.Configuration;
 
@@ -12,8 +10,8 @@ namespace JsonExtract
 {
     class Program
     {
-        private static CsvConfiguration csvConfiguration;
-        private static CommandLineOptions commandLineOptions;
+        private static CsvConfiguration _csvConfiguration;
+        private static CommandLineOptions _commandLineOptions;
 
         /// <summary>
         /// Writes the extracted json objects to csv file.
@@ -22,9 +20,9 @@ namespace JsonExtract
         /// <param name="outputPath">The output path.</param>
         private static void WriteOutput(List<List<string>> extractedObjects, string outputPath)
         {
-            using (TextWriter textWriter = new StreamWriter(outputPath))
+            using (TextWriter textWriter = new StreamWriter(outputPath, _commandLineOptions.Append))
             {
-                using (var csv = new CsvWriter(textWriter, csvConfiguration))
+                using (var csv = new CsvWriter(textWriter, _csvConfiguration))
                 {
                     foreach (List<string> extractedObjectProperties in extractedObjects)
                     {
@@ -45,14 +43,9 @@ namespace JsonExtract
         {
             List<string> paths = new List<string>();
 
-            if (String.IsNullOrEmpty(commandLineOptions.InputPath))
+            if (Directory.Exists(_commandLineOptions.InputPaths.First()))
             {
-                if (String.IsNullOrEmpty(commandLineOptions.InputDirectoryPath))
-                {
-                    throw new Exception("No input path specified.");
-                }
-
-                DirectoryInfo di = new DirectoryInfo(commandLineOptions.InputDirectoryPath);
+                DirectoryInfo di = new DirectoryInfo(_commandLineOptions.InputPaths.First());
 
                 FileInfo[] fileInfos = di.GetFiles("*.json");
 
@@ -60,15 +53,20 @@ namespace JsonExtract
             }
             else
             {
-                paths.Add(commandLineOptions.InputPath);
+                if (!File.Exists(_commandLineOptions.InputPaths.First()))
+                {
+                    throw new FileNotFoundException("Input path does not exists");
+                }
+
+                paths.Add(_commandLineOptions.InputPaths.First());
             }
 
             List<List<string>> extractedObjects = new List<List<string>>();
 
             foreach (string path in paths)
             {
-                string[] propertyPaths = commandLineOptions.PropertyPaths.Split(',');
-                extractedObjects.AddRange(JsonExtractor.ExtractObjects(commandLineOptions.JsonObjectArrayPath,
+                string[] propertyPaths = _commandLineOptions.PropertyPaths.Split(',');
+                extractedObjects.AddRange(JsonExtractor.ExtractObjects(_commandLineOptions.JsonObjectArrayPath,
                     propertyPaths, path));
             }
 
@@ -77,21 +75,42 @@ namespace JsonExtract
 
         static void Main(string[] args)
         {
-            commandLineOptions = new CommandLineOptions();
+            _commandLineOptions = new CommandLineOptions();
 
-            if (CommandLine.Parser.Default.ParseArguments(args, commandLineOptions) == false)
+            if (Parser.Default.ParseArguments(args, _commandLineOptions) == false)
             {
                 Environment.Exit(1);
             }
 
-            csvConfiguration = new CsvConfiguration
+            if (_commandLineOptions.InputPaths.Count == 0)
+            {
+                Console.WriteLine("Please provide input path.");
+                Environment.Exit(1);
+            }
+
+            _csvConfiguration = new CsvConfiguration
             {
                 Delimiter = ","
             };
 
-            List<List<string>> extractedObjects = ExtractFiles();
+            List<List<string>> extractedObjects = null;
 
-            WriteOutput(extractedObjects, commandLineOptions.OutputPath);
+            try
+            {
+                extractedObjects = ExtractFiles();
+            }
+            catch (FileNotFoundException)
+            {
+                Console.WriteLine("Specified input path does not exists.");
+                Environment.Exit(1);
+            }
+            catch (InvalidCastException e)
+            {
+                Console.WriteLine(e.Message);
+                Environment.Exit(1);
+            }
+            
+            WriteOutput(extractedObjects, _commandLineOptions.OutputPath);
         }
     }
 }
